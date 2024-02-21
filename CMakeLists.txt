@@ -1,0 +1,16 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+PROJECT(Task)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_BUILD_TYPE "Release")
+
+# include_directories(${OpenCV_INCLUDE_DIRS}) # CV
+
+# link_directories(${ZED_LIBRARY_DIR})
+
+ADD_EXECUTABLE(${PROJECT_NAME} include/utils.hpp src/main.cpp) ## !
+
+TARGET_LINK_LIBRARIES(
+    ${PROJECT_NAME} 
+)

@@ -1,16 +1,12 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
-PROJECT(Task)
+cmake_minimum_required(VERSION 3.5)
+PROJECT(Tcp_System)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_BUILD_TYPE "Release")
 
-# include_directories(${OpenCV_INCLUDE_DIRS}) # CV
+SET(DIRECTORIES "")
+add_subdirectory("Client")
+add_subdirectory("Server")
 
-# link_directories(${ZED_LIBRARY_DIR})
-
-ADD_EXECUTABLE(${PROJECT_NAME} include/utils.hpp src/main.cpp) ## !
-
-TARGET_LINK_LIBRARIES(
-    ${PROJECT_NAME} 
-)
+if(${INSTALL_SAMPLES})
+    INSTALL(TARGETS ${DIRECTORIES} RUNTIME DESTINATION ${CMAKE_SOURCE_DIR}/bin)
+endif()

@@ -27,8 +27,15 @@ struct settings
     }
 };
 
+struct connection
+{
+    int clientSocket;
+    ERRORCODE ERROR;
+};
+
 void sendFile(const std::string &filename, int serverSocket);
 settings parseSettings(int argc, char *argv[], settings defaultSettings);
+connection openConnection(settings);
 
 int main(int argc, char *argv[])
 {
@@ -44,38 +51,44 @@ int main(int argc, char *argv[])
         return 1;
     sets.print();
 
-    // Create socket
+    connection conn = openConnection(sets);
+    if (conn.ERROR != ERRORCODE::SUCCESS)
+        return 1;
+
+    sendFile(sets.filename, conn.clientSocket);
+    close(conn.clientSocket);
+
+    return 0;
+}
+
+connection openConnection(settings settings)
+{
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (clientSocket == -1)
     {
         std::cerr << "Error creating socket" << std::endl;
-        return 1;
+        return {clientSocket, ERRORCODE::ERROR};
     }
 
     // Set server information
     sockaddr_in serverAddress{};
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(sets.port);
+    serverAddress.sin_port = htons(settings.port);
 
-    if (inet_pton(AF_INET, sets.serverIP.c_str(), &(serverAddress.sin_addr)) <= 0)
+    if (inet_pton(AF_INET, settings.serverIP.c_str(), &(serverAddress.sin_addr)) <= 0)
     {
         std::cerr << "Invalid server address" << std::endl;
-        return 1;
+        return {clientSocket, ERRORCODE::ERROR};
     }
 
     // Connect to the server
     if (connect(clientSocket, reinterpret_cast<sockaddr *>(&serverAddress), sizeof(serverAddress)) == -1)
     {
         std::cerr << "Failed to connect to the server" << std::endl;
-        return 1;
+        return {clientSocket, ERRORCODE::ERROR};
     }
 
-    sendFile(sets.filename, clientSocket);
-
-    // Close the socket
-    close(clientSocket);
-
-    return 0;
+    return {clientSocket, ERRORCODE::SUCCESS};
 }
 
 settings parseSettings(int argc, char *argv[], settings defaultSettings)

@@ -3,7 +3,137 @@
 #include <string>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
 #include <unistd.h>
+
+enum ERRORCODE
+{
+    SUCCESS,
+    ERROR,
+};
+
+struct settings
+{
+    std::string filename;
+    std::string serverIP;
+    int port;
+    ERRORCODE ERROR;
+
+    void print()
+    {
+        std::cout << "Filename: " << filename << std::endl;
+        std::cout << "IP Address: " << serverIP << std::endl;
+        std::cout << "Port: " << port << std::endl;
+    }
+};
+
+void sendFile(const std::string &filename, int serverSocket);
+settings parseSettings(int argc, char *argv[], settings defaultSettings);
+
+int main(int argc, char *argv[])
+{
+    settings defaultSettings = {
+        .filename = "Default.md",
+        .serverIP = "127.0.0.1",
+        .port = 1234,
+        .ERROR = ERRORCODE::ERROR,
+    };
+
+    settings sets = parseSettings(argc, argv, defaultSettings);
+    if (sets.ERROR != ERRORCODE::SUCCESS)
+        return 1;
+    sets.print();
+
+    // Create socket
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket == -1)
+    {
+        std::cerr << "Error creating socket" << std::endl;
+        return 1;
+    }
+
+    // Set server information
+    sockaddr_in serverAddress{};
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(sets.port);
+
+    if (inet_pton(AF_INET, sets.serverIP.c_str(), &(serverAddress.sin_addr)) <= 0)
+    {
+        std::cerr << "Invalid server address" << std::endl;
+        return 1;
+    }
+
+    // Connect to the server
+    if (connect(clientSocket, reinterpret_cast<sockaddr *>(&serverAddress), sizeof(serverAddress)) == -1)
+    {
+        std::cerr << "Failed to connect to the server" << std::endl;
+        return 1;
+    }
+
+    sendFile(sets.filename, clientSocket);
+
+    // Close the socket
+    close(clientSocket);
+
+    return 0;
+}
+
+settings parseSettings(int argc, char *argv[], settings defaultSettings)
+{
+    if (argc < 2 || argc > 6)
+    {
+        std::cout << "Usage: ./Tcp_Client <filename> -i <ip_address> -p <port>" << std::endl;
+        return defaultSettings;
+    }
+
+    settings undefined = {
+        .filename = "",
+        .serverIP = "",
+        .port = -1,
+        .ERROR = ERRORCODE::ERROR,
+    };
+
+    settings out = {
+        .filename = argv[1],
+        .serverIP = undefined.serverIP,
+        .port = undefined.port,
+        .ERROR = undefined.ERROR,
+    };
+
+    if (argc > 2)
+    {
+        // loop doesn't check the last arg to avoid segfault if only the flag is passed
+        for (int i = 1; i < argc - 1; i++)
+        {
+            if (std::string(argv[i]) == "-i")
+            {
+                int arg_number = i + 1;
+                if (argv[arg_number][0] != '-')
+                    out.serverIP = argv[arg_number];
+            }
+            else if (std::string(argv[i]) == "-p")
+            {
+                int arg_number = i + 1;
+                if (argv[arg_number][0] != '-')
+                    out.port = atoi(argv[arg_number]);
+            }
+        }
+
+        if ((out.serverIP == undefined.serverIP && out.port == undefined.port) || argc % 2 == 1)
+        {
+            std::cout << "Use -i to indicate <ip_adress>\nUse -p to indicate <port>" << std::endl;
+            return defaultSettings;
+        }
+    }
+
+    if (out.serverIP == undefined.serverIP)
+        out.serverIP = defaultSettings.serverIP;
+    if (out.port == undefined.port)
+        out.port = defaultSettings.port;
+
+    out.ERROR = ERRORCODE::SUCCESS;
+    return out;
+}
 
 void sendFile(const std::string &filename, int serverSocket)
 {
@@ -31,48 +161,4 @@ void sendFile(const std::string &filename, int serverSocket)
     }
 
     file.close();
-}
-
-int main()
-{
-    std::string serverIP = "127.0.0.1";
-    int serverPort = 1234;
-
-    // Create socket
-    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (clientSocket == -1)
-    {
-        std::cerr << "Error creating socket" << std::endl;
-        return 1;
-    }
-
-    // Set server information
-    sockaddr_in serverAddress{};
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(serverPort);
-
-    if (inet_pton(AF_INET, serverIP.c_str(), &(serverAddress.sin_addr)) <= 0)
-    {
-        std::cerr << "Invalid server address" << std::endl;
-        return 1;
-    }
-
-    // Connect to the server
-    if (connect(clientSocket, reinterpret_cast<sockaddr *>(&serverAddress), sizeof(serverAddress)) == -1)
-    {
-        std::cerr << "Failed to connect to the server" << std::endl;
-        return 1;
-    }
-
-    // Send file to server
-    std::string filename;
-    std::cout << "Enter file name: ";
-    std::cin >> filename;
-
-    sendFile(filename, clientSocket);
-
-    // Close the socket
-    close(clientSocket);
-
-    return 0;
 }

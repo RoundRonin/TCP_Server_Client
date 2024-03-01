@@ -29,7 +29,7 @@ struct settings
 
 struct connection
 {
-    int clientSocket;
+    int serverSocket;
     ERRORCODE ERROR;
 };
 
@@ -55,19 +55,19 @@ int main(int argc, char *argv[])
     if (conn.ERROR != ERRORCODE::SUCCESS)
         return 1;
 
-    sendFile(sets.filename, conn.clientSocket);
-    close(conn.clientSocket);
+    sendFile(sets.filename, conn.serverSocket);
+    close(conn.serverSocket);
 
     return 0;
 }
 
 connection openConnection(settings settings)
 {
-    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (clientSocket == -1)
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket == -1)
     {
         std::cerr << "Error creating socket" << std::endl;
-        return {clientSocket, ERRORCODE::ERROR};
+        return {serverSocket, ERRORCODE::ERROR};
     }
 
     // Set server information
@@ -78,17 +78,17 @@ connection openConnection(settings settings)
     if (inet_pton(AF_INET, settings.serverIP.c_str(), &(serverAddress.sin_addr)) <= 0)
     {
         std::cerr << "Invalid server address" << std::endl;
-        return {clientSocket, ERRORCODE::ERROR};
+        return {serverSocket, ERRORCODE::ERROR};
     }
 
     // Connect to the server
-    if (connect(clientSocket, reinterpret_cast<sockaddr *>(&serverAddress), sizeof(serverAddress)) == -1)
+    if (connect(serverSocket, reinterpret_cast<sockaddr *>(&serverAddress), sizeof(serverAddress)) == -1)
     {
         std::cerr << "Failed to connect to the server" << std::endl;
-        return {clientSocket, ERRORCODE::ERROR};
+        return {serverSocket, ERRORCODE::ERROR};
     }
 
-    return {clientSocket, ERRORCODE::SUCCESS};
+    return {serverSocket, ERRORCODE::SUCCESS};
 }
 
 settings parseSettings(int argc, char *argv[], settings defaultSettings)

@@ -1,4 +1,5 @@
 build
+.cache
 .vscode
 Tcp_Client
 Tcp_Server

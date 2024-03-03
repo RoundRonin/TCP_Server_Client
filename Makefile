@@ -6,13 +6,15 @@ build:
 	cd build && cmake ..
 	cd build && make
 	ln -s ./build/Client/Tcp_Client ./Tcp_Client
-	ln -s ./build/Server/Tcp_Server ./Tcp_Server
+	# ln -s ./build/Server/Tcp_Server ./Tcp_Server
+	ln -s ./build/bin/Tcp_Server ./Tcp_Server
 
 .PHONY: rebuild
 rebuild:
 	cd build && make
 	ln -s ./build/Client/Tcp_Client ./Tcp_Client
-	ln -s ./build/Server/Tcp_Server ./Tcp_Server
+	# ln -s ./build/Server/Tcp_Server ./Tcp_Server
+	ln -s ./build/bin/Tcp_Server ./Tcp_Server
 
 .PHONY: remove
 remove:

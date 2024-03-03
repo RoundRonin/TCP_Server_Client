@@ -16,8 +16,8 @@ rebuild:
 	# ln -s ./build/Server/Tcp_Server ./Tcp_Server
 	ln -s ./build/bin/Tcp_Server ./Tcp_Server
 
-.PHONY: remove
-remove:
+.PHONY: clean 
+clean:
 	rm -rf ./build
 	rm Tcp_Client
 	rm Tcp_Server

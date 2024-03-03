@@ -7,15 +7,14 @@
 #include <unistd.h>
 #include <vector>
 
+#include <filesystem>
 #include <fstream>
 #include <json/json.h>
 #include <string>
 
 #include <csignal>
 
-// Максимальное количество потоков, порт, максимальный размер файла, а также
-// путь для сохранения файлов должны указываться в аргументах запуска сервера
-// или конфигурационном файле
+namespace fs = std::filesystem;
 
 enum ERRORCODE
 {
@@ -36,7 +35,7 @@ struct settingsServer
     {
         std::cout << "Max threads: " << maxThreads << std::endl;
         std::cout << "Port: " << port << std::endl;
-        std::cout << "Max file size: " << maxFileSize << std::endl;
+        std::cout << "Max file size: " << maxFileSize << " KB" << std::endl;
         std::cout << "Save path: " << savePath << std::endl;
     }
 };
@@ -50,8 +49,9 @@ struct connection
 connection startServer(settingsServer settings);
 settingsServer parseSettings(int argc, char *argv[],
                              settingsServer defaultSettings);
-void handleConnection(int clientSocket);
+void handleConnection(int clientSocket, settingsServer settings);
 void signalHandler(int signalNumber);
+fs::path handleFileName(int clientSocket, settingsServer settings);
 
 int main(int argc, char *argv[])
 {
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
         .maxThreads = 4,
         .port = 1234,
         .maxFileSize = 8096,
-        .savePath = "./",
+        .savePath = "./Output",
         .ERROR = ERRORCODE::ERROR,
     };
 
@@ -98,18 +98,107 @@ int main(int argc, char *argv[])
         }
 
         // Handle the connection in a separate thread
-        std::thread connectionThread(handleConnection, clientSocket);
+        std::thread connectionThread(handleConnection, clientSocket, sets);
         connectionThread.detach();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    // Close the server socket
     close(connection.serverSocket);
 
     return 0;
 }
+
+void handleConnection(int clientSocket, settingsServer settings)
+{
+    // Receive file size, bytes
+    size_t fileSize;
+    recv(clientSocket, reinterpret_cast<char *>(&fileSize), sizeof(fileSize), 0);
+
+    int status = -1;
+
+    if ((int)fileSize / 1024 > settings.maxFileSize)
+    {
+        std::cout << "[ERROR]" << std::endl;
+        std::cout << "  File exceeds max size limit: " << std::endl;
+        std::cout << "    Maxixum size is " << settings.maxFileSize << " KB" << std::endl;
+        std::cout << "    Client tried sending " << (int)fileSize / 1024 << " KB" << std::endl;
+
+        status = -1;
+    }
+    else
+    {
+        fs::path outputFile = handleFileName(clientSocket, settings);
+
+        char buffer[4096];
+        size_t totalReceived = 0;
+        std::ofstream outputFileStream(outputFile.string(), std::ios::binary); // Open the output file in binary mode
+
+        while (totalReceived < fileSize)
+        {
+            ssize_t received = recv(clientSocket, buffer, sizeof(buffer), 0);
+            if (received <= 0)
+            {
+                std::cerr << "Error receiving file" << std::endl;
+                break;
+            }
+            totalReceived += received;
+            outputFileStream.write(buffer, received);
+
+            std::cout << totalReceived << std::endl;
+        }
+
+        std::cout << "[INFO]" << std::endl;
+        std::cout << "  Successfully received file" << std::endl;
+
+        status = 0;
+    }
+
+    send(clientSocket, reinterpret_cast<const char *>(&status), sizeof(status), 0);
+    send(clientSocket, reinterpret_cast<const char *>(&settings.maxFileSize), sizeof(settings.maxFileSize), 0);
+
+    close(clientSocket);
+}
+
+fs::path handleFileName(int clientSocket, settingsServer settings)
+{
+    // Receive file name length
+    size_t fileNameLength;
+    recv(clientSocket, reinterpret_cast<char *>(&fileNameLength), sizeof(fileNameLength), 0);
+
+    std::cout << fileNameLength << std::endl;
+
+    // Receive file name
+    char fileNameBuffer[fileNameLength];
+    recv(clientSocket, fileNameBuffer, sizeof(fileNameBuffer), 0);
+    std::string fileName(fileNameBuffer, fileNameLength);
+
+    // Append the received file name to the savePath for the output file
+    fs::path savePathWithFileName = fs::path(settings.savePath) / fileName;
+
+    // Check if the output directory exists, create it if it doesn't
+    fs::path outputDirectory = savePathWithFileName.parent_path();
+    if (!fs::exists(outputDirectory))
+    {
+        fs::create_directories(outputDirectory);
+    }
+
+    // Check if the output file exists, create a new file name if it does
+    fs::path outputFile = savePathWithFileName;
+    int fileCounter = 1;
+    while (fs::exists(outputFile))
+    {
+        std::string newFileName = fileName.substr(0, fileName.find_last_of('.')) + '(' + std::to_string(fileCounter) + ')' +
+                                  fileName.substr(fileName.find_last_of('.'));
+        outputFile = fs::path(settings.savePath) / newFileName;
+        fileCounter++;
+    }
+
+    return outputFile;
+}
+
 connection startServer(settingsServer settings)
 {
-    // Create socket
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket == -1)
     {
@@ -117,13 +206,11 @@ connection startServer(settingsServer settings)
         return {serverSocket, ERRORCODE::ERROR};
     }
 
-    // Set server information
     sockaddr_in serverAddress{};
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(settings.port);
 
-    // Bind the socket to the server address
     if (bind(serverSocket, reinterpret_cast<sockaddr *>(&serverAddress),
              sizeof(serverAddress)) == -1)
     {
@@ -132,7 +219,7 @@ connection startServer(settingsServer settings)
     }
 
     // Listen for connections
-    if (listen(serverSocket, 5) == -1)
+    if (listen(serverSocket, settings.maxThreads) == -1)
     {
         std::cerr << "Failed to listen for connections" << std::endl;
         return {serverSocket, ERRORCODE::ERROR};
@@ -254,32 +341,6 @@ settingsServer parseSettings(int argc, char *argv[],
 
     out.ERROR = ERRORCODE::SUCCESS;
     return out;
-}
-
-void handleConnection(int clientSocket)
-{
-    // Receive file size
-    size_t fileSize;
-    recv(clientSocket, reinterpret_cast<char *>(&fileSize), sizeof(fileSize), 0);
-
-    // Receive file content
-    std::vector<char> buffer(4096);
-    size_t totalReceived = 0;
-    while (totalReceived < fileSize)
-    {
-        ssize_t received = recv(clientSocket, buffer.data(), buffer.size(), 0);
-        if (received <= 0)
-        {
-            std::cerr << "Error receiving file" << std::endl;
-            break;
-        }
-        totalReceived += received;
-        // Process received data as needed
-        // ...
-    }
-
-    // Close the client socket
-    close(clientSocket);
 }
 
 void signalHandler(int signalNumber)

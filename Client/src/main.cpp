@@ -5,6 +5,9 @@
 #include <arpa/inet.h>
 
 #include <unistd.h>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 enum ERRORCODE
 {
@@ -150,6 +153,10 @@ settings parseSettings(int argc, char *argv[], settings defaultSettings)
 
 void sendFile(const std::string &filename, int serverSocket)
 {
+    // std::string extractedFilename = fs::path(filename).filename();
+    std::string extractedFilename = "yye.png";
+    size_t filenameSize = extractedFilename.size();
+
     std::ifstream file(filename, std::ios::binary);
     if (!file)
     {
@@ -162,8 +169,9 @@ void sendFile(const std::string &filename, int serverSocket)
     size_t fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    // Send file size
     send(serverSocket, reinterpret_cast<const char *>(&fileSize), sizeof(fileSize), 0);
+    send(serverSocket, reinterpret_cast<const char *>(&filenameSize), sizeof(filenameSize), 0);
+    send(serverSocket, extractedFilename.c_str(), extractedFilename.size(), 0);
 
     // Send file content
     char buffer[4096];
@@ -171,6 +179,26 @@ void sendFile(const std::string &filename, int serverSocket)
     {
         file.read(buffer, sizeof(buffer));
         send(serverSocket, buffer, file.gcount(), 0);
+    }
+    std::cout << "Yep!" << std::endl;
+    int status = -2;
+    recv(serverSocket, reinterpret_cast<char *>(&status), sizeof(status), 0);
+    int additional_info;
+    recv(serverSocket, reinterpret_cast<char *>(&additional_info), sizeof(additional_info), 0);
+
+    switch (status)
+    {
+    case -1:
+        std::cout << "[ERROR]" << std::endl;
+        std::cout << "  Failed to send file, the file is too big!" << std::endl;
+        std::cout << "    Appropriate file size is " << additional_info << " KB" << std::endl;
+        std::cout << "    While you've tried sending " << (int)fileSize / 1024 << " KB!" << std::endl;
+        break;
+
+    default:
+        std::cout << "[INFO]" << std::endl;
+        std::cout << "  Succesful file sending" << std::endl;
+        break;
     }
 
     file.close();

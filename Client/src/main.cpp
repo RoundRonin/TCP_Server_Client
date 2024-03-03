@@ -153,8 +153,7 @@ settings parseSettings(int argc, char *argv[], settings defaultSettings)
 
 void sendFile(const std::string &filename, int serverSocket)
 {
-    // std::string extractedFilename = fs::path(filename).filename();
-    std::string extractedFilename = "yye.png";
+    std::string extractedFilename = fs::path(filename).filename();
     size_t filenameSize = extractedFilename.size();
 
     std::ifstream file(filename, std::ios::binary);
@@ -180,7 +179,6 @@ void sendFile(const std::string &filename, int serverSocket)
         file.read(buffer, sizeof(buffer));
         send(serverSocket, buffer, file.gcount(), 0);
     }
-    std::cout << "Yep!" << std::endl;
     int status = -2;
     recv(serverSocket, reinterpret_cast<char *>(&status), sizeof(status), 0);
     int additional_info;

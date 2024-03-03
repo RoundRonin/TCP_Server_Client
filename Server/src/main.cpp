@@ -51,9 +51,14 @@ connection startServer(settingsServer settings);
 settingsServer parseSettings(int argc, char *argv[],
                              settingsServer defaultSettings);
 void handleConnection(int clientSocket);
+void signalHandler(int signalNumber);
 
 int main(int argc, char *argv[])
 {
+    bool terminateServer = false;
+
+    std::signal(SIGTERM, signalHandler);
+    std::signal(SIGHUP, signalHandler);
 
     settingsServer defaultSettings = {
         .maxThreads = 4,
@@ -275,4 +280,13 @@ void handleConnection(int clientSocket)
 
     // Close the client socket
     close(clientSocket);
+}
+
+void signalHandler(int signalNumber)
+{
+    if (signalNumber == SIGTERM || signalNumber == SIGHUP)
+    {
+        std::cout << "Recieved interupt signal: " << signalNumber << "\nExiting..." << std::endl;
+        exit(signalNumber);
+    }
 }

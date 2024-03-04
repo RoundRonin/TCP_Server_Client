@@ -21,6 +21,10 @@
 #include <string>
 
 #include <csignal>
+#include <any>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
 
 enum ERRORCODE
 {
@@ -35,7 +39,6 @@ struct settings
     int port;
     int maxFileSize;
     std::string savePath;
-    ERRORCODE ERROR;
 
     void print()
     {
@@ -55,6 +58,7 @@ private:
     settings currentSettings;
 
     int serverSocket;
+    bool exit;
 
 public:
     TcpServer()
@@ -64,7 +68,6 @@ public:
             .port = -1,
             .maxFileSize = -1,
             .savePath = "",
-            .ERROR = ERRORCODE::ERROR,
         };
 
         serverSocket = -1;
@@ -73,7 +76,13 @@ public:
 
     ERRORCODE acceptConnections()
     {
-        while (true)
+        std::vector<std::thread> threadPool;
+        for (int i = 0; i < currentSettings.maxThreads; ++i)
+        {
+            threadPool.emplace_back(&TcpServer::workerThread, this);
+        }
+
+        while (!exit)
         {
             // Accept a client connection
             sockaddr_in clientAddress{};
@@ -87,13 +96,24 @@ public:
                 std::cerr << "Failed to accept a client connection" << std::endl;
                 return ERRORCODE::ERROR;
             }
-
-            // Handle the connection in a separate thread
-            std::thread connectionThread(&TcpServer::handleConnection, this, clientSocket);
-            connectionThread.detach();
+            else
+            {
+                // Add the client socket to the work queue
+                std::unique_lock<std::mutex> lock(workQueueMutex);
+                workQueue.push(clientSocket);
+                workQueueCondition.notify_one(); 
+            }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
+
+        for (std::thread &thread : threadPool)
+        {
+            thread.join();
+        }
+
+
+        return ERRORCODE::SUCCESS;
     }
 
     ERRORCODE startServer()
@@ -131,6 +151,7 @@ public:
     void stopServer()
     {
         close(serverSocket);
+        exit = true;
     }
 
     ERRORCODE parseSettings(int argc, char *argv[])
@@ -143,7 +164,6 @@ public:
             .port = undefined.port,
             .maxFileSize = undefined.maxFileSize,
             .savePath = undefined.savePath,
-            .ERROR = undefined.ERROR,
         };
 
         if (argv[1][0] == '-')
@@ -232,8 +252,37 @@ public:
     }
 
 private:
+    std::mutex workQueueMutex;
+    std::condition_variable workQueueCondition;
+    std::queue<int> workQueue;
+
+    // Worker thread function
+    void workerThread()
+    {
+        while (true)
+        {
+            std::unique_lock<std::mutex> lock(workQueueMutex);
+            workQueueCondition.wait(lock, [&]()
+                                    { return !workQueue.empty() || exit; });
+
+            if (exit)
+            {
+                break; // Exit the worker thread
+            }
+
+            int clientSocket = workQueue.front();
+            workQueue.pop();
+            lock.unlock();
+
+            // Handle the connection in a separate thread
+            std::thread connectionThread(&TcpServer::handleConnection, this, clientSocket);
+            connectionThread.detach();
+        }
+    }
+
     void handleConnection(int clientSocket)
     {
+        // std::this_thread::sleep_for(std::chrono::milliseconds(4000));
         // Receive file size, bytes
         size_t fileSize;
         recv(clientSocket, reinterpret_cast<char *>(&fileSize), sizeof(fileSize), 0);

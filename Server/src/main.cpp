@@ -1,20 +1,5 @@
-#include <arpa/inet.h>
-#include <cstdlib>
-#include <cstring>
-#include <iostream>
-#include <sys/socket.h>
-#include <thread>
-#include <unistd.h>
-#include <vector>
-
-#include <filesystem>
-#include <fstream>
-#include <json/json.h>
-#include <string>
-
-#include <csignal>
-
 #include "TcpServer.hpp"
+#include <iterator>
 
 void fatalErrorHandler();
 void signalHandler(int signalNumber);
@@ -32,7 +17,6 @@ int main(int argc, char *argv[])
             .port = 1234,
             .maxFileSize = 8096,
             .savePath = "./Output",
-            .ERROR = ERRORCODE::ERROR,
         });
 
     if (server.parseSettings(argc, argv))
@@ -55,7 +39,7 @@ void fatalErrorHandler()
 {
     std::cout << "Usage: ./Tcp_Server <configFile>" << std::endl
               << "or: ./Tcp_Server -t <maxThreads> -p <port> -s <maxFileSize> "
-                 "-f <savePath>";
+                 "-f <savePath>" << std::endl;
     exit(1);
 }
 

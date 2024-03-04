@@ -101,7 +101,7 @@ public:
                 // Add the client socket to the work queue
                 std::unique_lock<std::mutex> lock(workQueueMutex);
                 workQueue.push(clientSocket);
-                workQueueCondition.notify_one(); 
+                workQueueCondition.notify_one();
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -111,7 +111,6 @@ public:
         {
             thread.join();
         }
-
 
         return ERRORCODE::SUCCESS;
     }
@@ -275,8 +274,9 @@ private:
             lock.unlock();
 
             // Handle the connection in a separate thread
-            std::thread connectionThread(&TcpServer::handleConnection, this, clientSocket);
-            connectionThread.detach();
+            // std::thread connectionThread(&TcpServer::handleConnection, this, clientSocket);
+            // connectionThread.detach();
+            handleConnection(clientSocket);
         }
     }
 

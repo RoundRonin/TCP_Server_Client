@@ -47,7 +47,7 @@ struct settings
         std::cout << "Max file size: " << maxFileSize << " KB" << std::endl;
         std::cout << "Save path: " << savePath << std::endl;
     }
-};
+}
 
 class TcpServer
 {
@@ -255,7 +255,6 @@ private:
     std::condition_variable workQueueCondition;
     std::queue<int> workQueue;
 
-    // Worker thread function
     void workerThread()
     {
         while (true)
@@ -266,24 +265,19 @@ private:
 
             if (exit)
             {
-                break; // Exit the worker thread
+                break; 
             }
 
             int clientSocket = workQueue.front();
             workQueue.pop();
             lock.unlock();
 
-            // Handle the connection in a separate thread
-            // std::thread connectionThread(&TcpServer::handleConnection, this, clientSocket);
-            // connectionThread.detach();
             handleConnection(clientSocket);
         }
     }
 
     void handleConnection(int clientSocket)
     {
-        // std::this_thread::sleep_for(std::chrono::milliseconds(4000));
-        // Receive file size, bytes
         size_t fileSize;
         recv(clientSocket, reinterpret_cast<char *>(&fileSize), sizeof(fileSize), 0);
 

@@ -15,10 +15,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(jsoncpp)
 
-ADD_EXECUTABLE(${PROJECT_NAME} src/main.cpp) ## ! include/utils.hpp 
+ADD_EXECUTABLE(${PROJECT_NAME} src/main.cpp)
 
 TARGET_LINK_LIBRARIES(
     ${PROJECT_NAME}
-    # PRIVATE nlohmann_json::nlohmann_json
     jsoncpp_lib
     )

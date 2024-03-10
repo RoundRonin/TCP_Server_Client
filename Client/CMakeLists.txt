@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_BUILD_TYPE "Release")
 
 
-ADD_EXECUTABLE(${PROJECT_NAME} src/main.cpp) ## !include/utils.hpp
+ADD_EXECUTABLE(${PROJECT_NAME} src/main.cpp) 
 
 TARGET_LINK_LIBRARIES(
     ${PROJECT_NAME} 
